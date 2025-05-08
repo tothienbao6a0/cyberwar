@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Orbitron:wght@400;700&family=Oxanium:wght@400;700&family=Rajdhani:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --radius: 0.5rem;
+
+    /* NEURALFRONT Custom Colors */
+    --neuralfront-bg: 220 26% 6%; /* #0B0F14 */
+    --neuralfront-accent-cyan: 170 100% 50%; /* #00FFD1 */
+    --neuralfront-alert-red: 357 100% 65%; /* #FF4F58 */
+    --neuralfront-ai-green: 80 100% 50%; /* #96FF00 */
+    --neuralfront-borders-lines: 210 22% 16%; /* #202932 */
+  }
+
+  .dark {
+    --background: 220 26% 6%; /* #0B0F14 - Overriding shadcn's dark background */
+    --foreground: 0 0% 98%;
+    --card: 220 26% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 26% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 220 26% 6%;
+    --secondary: 210 22% 16%; /* --neuralfront-borders-lines */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 210 22% 16%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 170 100% 50%; /* --neuralfront-accent-cyan */
+    --accent-foreground: 220 26% 6%;
+    --destructive: 357 100% 65%; /* --neuralfront-alert-red */
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 22% 16%; /* --neuralfront-borders-lines */
+    --input: 210 22% 16%;
+    --ring: 170 100% 50%; /* --neuralfront-accent-cyan */
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Rajdhani', sans-serif; /* Default font */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif; /* Headings font */
+  }
+} 
