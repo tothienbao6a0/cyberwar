@@ -1,74 +1,145 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamObject } from 'ai'; // Removed StreamingTextResponse import
+import { streamText } from 'ai';
 import { NextResponse } from 'next/server';
-import { z } from 'zod'; // For defining the schema of the expected object
+import { z } from 'zod';
+import { rateLimit } from '@/lib/security/rateLimit';
+import { sanitizeCommand } from '@/lib/security/sanitize';
+import { validateGameRules } from '@/lib/security/gameRules';
 
 // Initialize the AI SDK OpenAI provider client
 const openaiProvider = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY || ''
-  // Other options like baseURL for OpenRouter can be added here
 });
 
 export const runtime = 'edge';
 
-// Define the Zod schema for the structured command
-// This helps ensure the LLM returns the correct shape and types.
-const CommandSchema = z.object({
-  action: z.string(),
-  unitType: z.string().nullable().optional(),
-  unitId: z.string().nullable().optional(),
-  count: z.union([z.number(), z.string()]).nullable().optional(), // string for "all"
-  direction: z.string().nullable().optional(),
-  target: z.string().nullable().optional(),
-  coordinates: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
-  priority: z.string().nullable().optional(),
-  formation: z.string().nullable().optional(),
-  specialAbility: z.string().nullable().optional(),
-});
+// Define allowed actions and unit types for strict validation
+const ALLOWED_ACTIONS = [
+  'move', 'attack', 'defend', 'scout', 'patrol', 'deploy', 
+  'retreat', 'flank', 'reinforce'
+] as const;
+
+const ALLOWED_UNIT_TYPES = [
+  'scout', 'defender', 'attacker', 'engineer', 'drone', 
+  'tank', 'special_ops', 'medic'
+] as const;
+
+interface CommandRequest {
+  type: string;
+  payload: {
+    text: string;
+    action: string;
+    timestamp: number;
+  };
+}
+
+// Command injection patterns to detect
+const SUSPICIOUS_PATTERNS = [
+  /exec\s*\(/i,
+  /eval\s*\(/i,
+  /system\s*\(/i,
+  /process\s*\./i,
+  /require\s*\(/i,
+  /__proto__/i,
+  /constructor/i,
+  /prototype/i,
+  /\{\{.*\}\}/i, // Template injection
+  /<script/i,
+  /javascript:/i,
+  /data:/i,
+  /vbscript:/i,
+];
 
 export async function POST(req: Request) {
   try {
-    const { prompt } = await req.json();
+    // Rate limiting
+    const identifier = req.headers.get('x-forwarded-for') || 'anonymous';
+    const { success } = await rateLimit(identifier);
+    
+    if (!success) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
 
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    // Parse the request body
+    const body = await req.json();
+    const command = body as CommandRequest;
+
+    if (!command?.payload?.text || typeof command.payload.text !== 'string') {
+      return NextResponse.json({ error: 'Invalid command format' }, { status: 400 });
+    }
+
+    const prompt = command.payload.text;
+
+    // Check for suspicious patterns
+    if (SUSPICIOUS_PATTERNS.some(pattern => pattern.test(prompt))) {
+      console.warn(`[Security] Suspicious command pattern detected: ${prompt}`);
+      return NextResponse.json({ error: 'Invalid command format' }, { status: 400 });
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
 
-    const systemMessage = `You are an AI assistant for NEURALFRONT. Your role is to interpret natural language commands from players and convert them into a structured JSON object that strictly adheres to the following Zod schema definition (pay attention to optional/nullable fields):
-    {
-      action: string, (e.g., "move", "attack", "deploy")
-      unitType?: string | null, (e.g., "scout", "attacker")
-      unitId?: string | null, (e.g., "alpha-1", "drone-7")
-      count?: number | string | null, (e.g., 1, 5, "all")
-      direction?: string | null, (e.g., "north", "right")
-      target?: string | null, (e.g., "enemy-base", "unit-beta-2", "sector D5")
-      coordinates?: { x: number, y: number } | null,
-      priority?: string | null, (e.g., "high", "low")
-      formation?: string | null, (e.g., "line", "spread")
-      specialAbility?: string | null (e.g., "stealth_mode", "emp_blast")
-    }
-    Provide only the JSON object. No explanations or markdown. For example: "Send two scouts to flank right" -> {"action": "flank", "unitType": "scout", "count": 2, "direction": "right"}
-    Reference for possible values (be flexible but try to use these if applicable):
-    Actions: "move", "attack", "defend", "scout", "patrol", "build", "repair", "deploy", "retreat", "flank", "reinforce", "powerup", "hack", "scan".
-    UnitTypes: "scout", "defender", "attacker", "engineer", "drone", "tank", "special_ops", "medic".
-    Directions: "north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest", "forward", "backward", "left", "right".
-    Targets: "enemy_unit", "enemy_structure", "objective_point", "resource_node".
-    Priorities: "low", "medium", "high", "critical".
-    Formations: "line", "spread", "column", "wedge", "circle".
-    `;
+    // Process the natural language command
+    const systemMessage = `You are an AI assistant for NEURALFRONT that converts natural language commands into JSON objects.
+CRITICAL: You must ONLY output a valid JSON object. No text before or after. No explanations. No markdown formatting.
 
-    const result = await streamObject({
+The JSON must follow this structure (only 'action' is required):
+{
+  "action": string,     // Required: "move", "attack", "deploy", etc.
+  "unitType": string,   // "scout", "defender", "attacker", etc.
+  "unitId": string,     // "alpha-1", "drone-7", etc.
+  "count": number,      // How many units (e.g., 2, 5)
+  "direction": string,  // "north", "right", etc.
+  "target": string,     // "enemy-base", "unit-beta-2", etc.
+  "coordinates": {      // Position on grid
+    "x": number,
+    "y": number
+  },
+  "priority": string,   // "high", "low", etc.
+  "formation": string,  // "line", "spread", etc.
+  "specialAbility": string  // "stealth_mode", "emp_blast", etc.
+}
+
+Examples:
+Input: "Send two scouts to flank right"
+Output: {"action":"flank","unitType":"scout","count":2,"direction":"right"}
+
+Input: "Deploy 3 defenders at coordinates 10, 20"
+Output: {"action":"deploy","unitType":"defender","count":3,"coordinates":{"x":10,"y":20}}
+
+REMEMBER: Output ONLY the JSON object. No other text.`;
+
+    const result = await streamText({
       model: openaiProvider.chat('gpt-3.5-turbo'),
-      system: systemMessage,
-      prompt: prompt,
-      schema: CommandSchema,
+      messages: [
+        { role: 'system', content: systemMessage },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0
     });
 
-    return result.toTextStreamResponse(); // This should return a standard Response object
+    // Parse and validate the result
+    const parsedResult = JSON.parse(result.toString());
+    
+    // Validate game rules
+    const gameState = body.gameState;
+    const validationResult = validateGameRules(parsedResult, gameState);
+    if (!validationResult.valid) {
+      return NextResponse.json({ error: validationResult.reason }, { status: 400 });
+    }
+
+    // Sanitize the command
+    const sanitizedCommand = sanitizeCommand(parsedResult);
+
+    // Add security headers
+    const response = NextResponse.json(sanitizedCommand);
+    response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'");
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    return response;
 
   } catch (error: any) {
     console.error("[Interpret Command API Error]:", error);

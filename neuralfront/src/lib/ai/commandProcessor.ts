@@ -7,14 +7,44 @@ export function processCommand(command: ParsedCommand, gameState: GameState): vo
   switch (command.action?.toLowerCase()) {
     case 'deploy':
       if (command.unitType && command.coordinates) {
-        // Ensure unitType is a valid enum member if it comes as a string from LLM
-        const type = command.unitType.toUpperCase() as keyof typeof UnitType;
-        if (UnitType[type]) {
-          const count = typeof command.count === 'number' ? command.count : 1;
-          gameState.addAgent(UnitType[type], command.coordinates, count);
-        } else {
-          gameState.log(`Error: Invalid unitType '${command.unitType}' for deploy command.`);
+        // Convert unit type to enum, handling both cases
+        const unitTypeStr = command.unitType.toLowerCase();
+        let unitType: UnitType;
+        
+        // Try to match the unit type string to our enum
+        switch (unitTypeStr) {
+          case 'scout':
+            unitType = UnitType.SCOUT;
+            break;
+          case 'defender':
+            unitType = UnitType.DEFENDER;
+            break;
+          case 'attacker':
+            unitType = UnitType.ATTACKER;
+            break;
+          case 'engineer':
+            unitType = UnitType.ENGINEER;
+            break;
+          case 'drone':
+            unitType = UnitType.DRONE;
+            break;
+          case 'tank':
+            unitType = UnitType.TANK;
+            break;
+          case 'special_ops':
+          case 'specialops':
+            unitType = UnitType.SPECIAL_OPS;
+            break;
+          case 'medic':
+            unitType = UnitType.MEDIC;
+            break;
+          default:
+            gameState.log(`Error: Invalid unitType '${command.unitType}' for deploy command.`);
+            return;
         }
+
+        const count = typeof command.count === 'number' ? command.count : 1;
+        gameState.addAgent(unitType, command.coordinates, count);
       } else {
         gameState.log("Error: Deploy command missing unitType or coordinates.");
       }

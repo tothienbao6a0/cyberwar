@@ -3,17 +3,23 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useChat } from 'ai/react';
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 import { GameState, ParsedCommand } from "@/lib/ai/gameState";
 import { processCommand } from "@/lib/ai/commandProcessor";
 import { Agent } from "@/lib/ai/agent";
+import { Battlefield } from "@/components/Battlefield";
 
 export default function HomePage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, error: apiError } = useChat({
     api: '/api/interpret-command',
-    // Optional: you can handle the response directly if needed, but we parse it in useEffect
-    // onFinish: (message) => { console.log("LLM interaction finished:", message); }
+    onError: (error) => {
+      console.error("Chat Error:", error);
+    },
+    onResponse: (response) => {
+      console.log("API Response:", response);
+    },
+    streamProtocol: 'data'
   });
 
   const [parsedLLMCommand, setParsedLLMCommand] = useState<ParsedCommand | null>(null);
@@ -26,17 +32,21 @@ export default function HomePage() {
   const [actionLogs, setActionLogs] = useState<string[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
 
+  // Add state and ref for battlefield container dimensions
+  const battlefieldContainerRef = useRef<HTMLDivElement>(null);
+  const [battlefieldDimensions, setBattlefieldDimensions] = useState({ width: 0, height: 0 });
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!input.trim()) return; // Don't submit empty commands
+    
     setParsedLLMCommand(null);
     setProcessingError(null);
-    // Pass the current input as 'prompt' in the request body
+    
     handleSubmit(e, {
-      options: {
-        body: {
-          prompt: input, // Ensure the API route receives { prompt: ... }
-        },
-      },
+      body: {
+        prompt: input.trim()
+      }
     });
   };
 
@@ -45,7 +55,30 @@ export default function HomePage() {
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === 'assistant' && lastMessage.content) {
       try {
-        const jsonContent: ParsedCommand = JSON.parse(lastMessage.content);
+        // Clean the response: remove any non-JSON content and find the JSON object
+        let content = lastMessage.content.trim();
+        
+        // Try to find a JSON object in the content
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          console.warn("No JSON object found in response:", content);
+          throw new Error('No JSON object found in response');
+        }
+        
+        let jsonStr = jsonMatch[0];
+        
+        // Handle potential streaming artifacts
+        if (jsonStr.includes('```')) {
+          jsonStr = jsonStr.replace(/```json\n|\n```|```/g, '');
+        }
+        
+        const jsonContent: ParsedCommand = JSON.parse(jsonStr.trim());
+        
+        // Validate required fields
+        if (!jsonContent.action) {
+          throw new Error('Invalid command: missing required "action" field');
+        }
+        
         setParsedLLMCommand(jsonContent);
         setProcessingError(null);
 
@@ -59,13 +92,32 @@ export default function HomePage() {
       } catch (e) {
         console.error("Failed to parse assistant message as JSON or process command:", e);
         const errorDetails = e instanceof Error ? e.message : String(e);
-        setParsedLLMCommand({ action: "error", unitType: "error", details: lastMessage.content } as any);
-        setProcessingError(`Failed to parse LLM response or process command: ${errorDetails}. Raw: ${lastMessage.content}`);
+        setParsedLLMCommand(null);
+        setProcessingError(`Failed to parse command: ${errorDetails}`);
         setActionLogs(gameState.getActionLogs()); // Still update logs if any processing happened before error
         setAgents(gameState.getAgents());
       }
     }
   }, [messages, gameState]); // Depend on messages and gameState
+
+  // Update battlefield dimensions when container size changes
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (battlefieldContainerRef.current) {
+        setBattlefieldDimensions({
+          width: battlefieldContainerRef.current.clientWidth,
+          height: battlefieldContainerRef.current.clientHeight
+        });
+      }
+    };
+
+    // Initial size
+    updateDimensions();
+
+    // Listen for window resize
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
 
   return (
     <main className="flex flex-col h-screen bg-neuralfront-bg text-neutral-50 p-4 selection:bg-neuralfront-accent-cyan selection:text-neuralfront-bg">
@@ -123,12 +175,14 @@ export default function HomePage() {
           </div>
         </aside>
 
-        <section className="flex-1 flex items-center justify-center border border-neuralfront-borders-lines rounded-md bg-black/30">
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="text-neuralfront-borders-lines font-chakra-petch text-xl">
-              BATTLEFIELD CANVAS (react-konva)
-            </p>
-          </div>
+        <section ref={battlefieldContainerRef} className="flex-1 flex items-center justify-center border border-neuralfront-borders-lines rounded-md bg-black/30 overflow-hidden">
+          {battlefieldDimensions.width > 0 && battlefieldDimensions.height > 0 && (
+            <Battlefield
+              agents={agents}
+              width={battlefieldDimensions.width}
+              height={battlefieldDimensions.height}
+            />
+          )}
         </section>
 
         <aside className="w-1/4 p-2 border border-neuralfront-borders-lines rounded-md bg-neuralfront-bg/50 backdrop-blur-sm overflow-y-auto">

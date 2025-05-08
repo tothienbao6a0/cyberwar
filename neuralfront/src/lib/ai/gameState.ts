@@ -46,20 +46,28 @@ export class GameState {
   // Example method to add an agent (used by 'deploy' or initial setup)
   public addAgent(type: UnitType, position: { x: number; y: number }, count: number = 1): Agent[] {
     const newAgents: Agent[] = [];
+    const spacing = 2; // Two grid cells spacing between units
+
     for (let i = 0; i < count; i++) {
+      // Calculate offset position for multiple units in a more spread out formation
+      const offsetPosition = {
+        x: Math.max(0, position.x + (i % 3) * spacing), // Arrange in a 3xN grid
+        y: Math.max(0, position.y + Math.floor(i / 3) * spacing)
+      };
+
       const newAgent: Agent = {
         id: uuidv4(),
         ownerPlayerId: this.playerId,
         type,
-        position,
-        health: 100, // Default health
+        position: offsetPosition,
+        health: 100,
         maxHealth: 100,
         status: UnitActionStatus.IDLE,
         lastUpdated: Date.now(),
       };
       this.agents.set(newAgent.id, newAgent);
       newAgents.push(newAgent);
-      this.log(`Deployed ${type} unit ${newAgent.id} at (${position.x}, ${position.y}) for player ${this.playerId}`);
+      this.log(`Deployed ${type} unit ${newAgent.id.substring(0,8)} at (${offsetPosition.x}, ${offsetPosition.y})`);
     }
     return newAgents;
   }
@@ -68,12 +76,18 @@ export class GameState {
   public moveAgent(agentId: string, newPosition: { x: number; y: number }) {
     const agent = this.agents.get(agentId);
     if (agent) {
-      agent.position = newPosition;
+      // Ensure coordinates are non-negative
+      const safePosition = {
+        x: Math.max(0, newPosition.x),
+        y: Math.max(0, newPosition.y)
+      };
+      
+      agent.position = safePosition;
       agent.status = UnitActionStatus.MOVING;
-      agent.destination = newPosition;
+      agent.destination = safePosition;
       agent.lastUpdated = Date.now();
       this.agents.set(agentId, agent);
-      this.log(`Agent ${agentId} is now MOVING to (${newPosition.x}, ${newPosition.y})`);
+      this.log(`Agent ${agentId.substring(0,8)} is now MOVING to (${safePosition.x}, ${safePosition.y})`);
     } else {
       this.log(`Error: Agent ${agentId} not found for move command.`);
     }
