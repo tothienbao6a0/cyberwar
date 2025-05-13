@@ -3,6 +3,7 @@
 import { useGameSocket } from './useGameSocket';
 import { Battlefield } from '@/components/Battlefield';
 import { useEffect, useState } from 'react';
+import { Agent } from '@/lib/ai/agent';
 
 export default function GamePage() {
   const { isConnected, gameState, sendCommand } = useGameSocket();
@@ -78,7 +79,7 @@ export default function GamePage() {
       <div className="w-[300px] bg-[#0A0F14] p-4 border-l border-neuralfront-borders-lines overflow-y-auto">
         <h2 className="text-lg font-orbitron mb-4 text-neuralfront-accent-cyan">Agent Log</h2>
         <div className="space-y-2">
-          {gameState?.agents.map((agent) => (
+          {gameState?.agents.map((agent: Agent) => (
             <div 
               key={agent.id}
               className="p-2 rounded bg-[#151B22] border border-neuralfront-borders-lines"

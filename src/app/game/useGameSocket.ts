@@ -21,8 +21,10 @@ export function useGameSocket() {
   const messageSequence = useRef(0);
 
   useEffect(() => {
-    // Connect to WebSocket
-    socketRef.current = io({
+    // Connect to WebSocket, explicitly setting the path
+    // Pass undefined as URI to connect to the default host/port
+    socketRef.current = io(undefined, {
+      path: '/api/socket', // Match the server path
       auth: {
         token: 'dummy-token' // In production, use real auth token
       }

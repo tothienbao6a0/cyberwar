@@ -62,9 +62,12 @@ export async function POST(req: Request) {
 
     // Parse the request body
     const body = await req.json();
+    console.log('[Interpret API] Received Body:', JSON.stringify(body, null, 2)); // Log the received body
+    
     const command = body as CommandRequest;
 
     if (!command?.payload?.text || typeof command.payload.text !== 'string') {
+      console.error('[Interpret API] Validation Failed: command.payload.text is invalid or missing.'); // Log validation failure reason
       return NextResponse.json({ error: 'Invalid command format' }, { status: 400 });
     }
 
@@ -110,6 +113,7 @@ Output: {"action":"deploy","unitType":"defender","count":3,"coordinates":{"x":10
 
 REMEMBER: Output ONLY the JSON object. No other text.`;
 
+    console.log('[Interpret API] Calling streamText...'); // Log before calling AI
     const result = await streamText({
       model: openaiProvider.chat('gpt-3.5-turbo'),
       messages: [
@@ -118,9 +122,21 @@ REMEMBER: Output ONLY the JSON object. No other text.`;
       ],
       temperature: 0
     });
+    console.log('[Interpret API] streamText finished.'); // Log after calling AI
 
     // Parse and validate the result
-    const parsedResult = JSON.parse(result.toString());
+    const jsonString = await result.text;
+    console.log('[Interpret API] AI Response Text:', jsonString); // Log the raw text from AI
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(jsonString);
+      console.log('[Interpret API] JSON Parsed Successfully'); // Log success
+    } catch (parseError) {
+      console.error('[Interpret API] JSON Parsing Error:', parseError);
+      console.error('[Interpret API] Raw string that failed parsing:', jsonString);
+      // Re-throw or return an error response specific to parsing failure
+      return NextResponse.json({ error: 'AI returned invalid JSON format' }, { status: 500 });
+    }
     
     // Validate game rules
     const gameState = body.gameState;
