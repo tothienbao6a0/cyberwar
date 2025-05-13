@@ -1,68 +1,36 @@
-# NEURALFRONT
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-A futuristic real-time strategy game where players command AI agents on a cyberwar battlefield.
+## Getting Started
 
-## 🚀 Overview
-
-NEURALFRONT is a 1v1 AI-vs-AI battle game. Players input natural-language commands, which are then processed by an LLM and dispatched to AI agents. The game features a live-updating 2D battlefield.
-
-## 🛠 Tech Stack
-
-**Frontend:**
-- Next.js + React
-- Tailwind CSS
-- shadcn/ui
-- react-konva
-- Framer Motion
-
-**Backend:**
-- Supabase (PostgreSQL DB + Auth + Realtime)
-- WebSocket support (Supabase Realtime or Socket.io)
-- Vercel (Deployment + Edge Functions)
-
-**AI Layer:**
-- Vercel AI SDK (OpenRouter or OpenAI API)
-
-## 🎮 Game Logic
-
-- Players join matches via Supabase.
-- Commands are issued via a text bar (e.g., "Send two scouts to flank right").
-- LLM parses commands into structured JSON (e.g., `{ action: "flank", unitType: "scout", direction: "right", count: 2 }`).
-- AI units execute commands and adapt to the battlefield.
-
-## 🎨 UI Style
-
-- Theme: Minimalist 2030-era cyberwarfare UI.
-- Fonts: Orbitron, Rajdhani, Chakra Petch, Oxanium.
-- Color Palette:
-    - Background: `#0B0F14`
-    - Accent Cyan: `#00FFD1`
-    - Alert Red: `#FF4F58`
-    - AI Green: `#96FF00`
-    - Borders & Lines: `#202932`
-
-## ⚙️ Setup
+First, run the development server:
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd neuralfront
-
-# Install dependencies
-npm install
-
-# Run the development server
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## 📝 TODO
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-- [ ] Scaffold Next.js + Tailwind app
-- [x] Initialize shadcn/ui
-- [x] Create directory structure
-- [x] Create README.md
-- [ ] Create home page with dark background, command input, and placeholder canvas
-- [ ] Set up Supabase project (Realtime, Auth, DB schema)
-- [ ] Install and connect Vercel AI SDK
-- [ ] Build minimal agent logic engine
-- [ ] Add debug logs/terminal 
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
